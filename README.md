@@ -4,6 +4,7 @@
 This project is a basic GO API based on Google Drive. It allows you to authenticate users with ABAC (Attribute-Based Access Control) and JWT tokens. It also uses MongoDB to control user access and to manage the distribution of files and folders.
 
 
+
 ## Installation
 
 Download this project.
@@ -13,12 +14,30 @@ Install the Drive API with go
   go mod download
   go build cmd/main.go
 ```
-    
+
 Optionally, you can mount a drive in the 'files' folder to improve file management.
 
 ```bash
   mount /dev/sdb7 files
 ```
+
+
+
+## Mount systemd service:
+
+Update this variables on the `drive-api.service` both with absolute path:
+- `EXecStart`: your go generated binary
+- `WorkingDirectory`: path of your application directory
+
+Run the following commands
+
+```bash
+  cp drive-api.service /etc/systemd/system/drive-api.service
+  systemctl enable --now drive-api.service
+```
+
+
+
 ## API Reference
 
 #### Login
@@ -27,12 +46,13 @@ Optionally, you can mount a drive in the 'files' folder to improve file manageme
   POST /login
 ```
 
-| Parameter | Type     | Description                       |
-| :-------- | :------- | :-------------------------------- |
-| `username`| `string` | **Required**. Name of the user    |
-| `password`| `string` | **Required**. Key of the user     |
+| Parameter  | Type     | Description                       |
+| :--------  | :------- | :-------------------------------- |
+| `username` | `string` | **Required**. Name of the user    |
+| `password` | `string` | **Required**. Key of the user     |
 
 ##### Result: JWT Token string (Must be used on Authentication header)
+
 
 #### Logout
 
@@ -42,29 +62,15 @@ Optionally, you can mount a drive in the 'files' folder to improve file manageme
 
 ##### Result: logout message
 
-#### Get folder
+
+#### Check User
 
 ```http
-  GET /drive/d/{id}
+  GET /validateUser
 ```
 
-| Parameter | Type     | Description                       |
-| :-------- | :------- | :-------------------------------- |
-| `id`      | `string` | **Required**. Id of item to fetch |
+##### Result: JWT token or error
 
-##### Result: Array with Contents ID
-
-#### Delete resource
-
-```http
-  GET /drive/r/{id}
-```
-
-| Parameter | Type     | Description                       |
-| :-------- | :------- | :-------------------------------- |
-| `id`      | `string` | **Required**. Id of item to fetch |
-
-##### Result: Delete status message
 
 #### Get file
 
@@ -72,38 +78,79 @@ Optionally, you can mount a drive in the 'files' folder to improve file manageme
   GET /drive/f/{id}
 ```
 
-| Parameter | Type     | Description                       |
-| :-------- | :------- | :-------------------------------- |
-| `id`      | `string` | **Required**. Id of item to fetch |
+| Parameter  | Type     | Description                       |
+| :--------  | :------- | :-------------------------------- |
+| `id`       | `string` | **Required**. Id of item to fetch |
 
 ##### Result: File binary
+
+
+#### Get folder
+
+```http
+  GET /drive/d/{id}
+```
+
+| Parameter  | Type     | Description                       |
+| :--------  | :------- | :-------------------------------- |
+| `id`       | `string` | **Required**. Id of item to fetch |
+
+##### Result: requested resource
+
+
+#### Delete file
+
+```http
+  GET /drive/r/{id}
+```
+
+| Parameter  | Type     | Description                       |
+| :--------  | :------- | :-------------------------------- |
+| `id`       | `string` | **Required**. Id of item to fetch |
+
+##### Result: Delete status message
+
+
+#### Delete folder
+
+```http
+  GET /drive/rd/{id}?recursive=false
+```
+
+| Parameter  | Type     | Description                       |
+| :--------  | :------- | :-------------------------------- |
+| `id`       | `string` | **Required**. Id of item to fetch |
+| `recursive`| `string` | Delete childrens. true or false   |
+
+##### Result: Delete status message
+
 
 #### Upload file
 
 ```http
-  POST /drive/upload
+  POST /drive/upload/{parent}
 ```
 
-| Parameter | Type     | Description                       |
-| :-------- | :------- | :-------------------------------- |
-| `parent`  | `string` | ID of a directory if applies      |
-| `file`    | `binary` | **Required**. Data of the file    |
+| Parameter  | Type     | Description                       |
+| :--------  | :------- | :-------------------------------- |
+| `parent`   | `string` | ID of a directory if applies      |
+| `file`     | `binary` | **Required**. Data of the file    |
 
-##### Result: ID of the new element
+##### Result: created resource
+
 
 #### Create folder
 
 ```http
-  POST /drive/create
+  POST /drive/create/{name}
 ```
 
-| Parameter | Type     | Description                       |
-| :-------- | :------- | :-------------------------------- |
-| `parent`  | `string` | ID of a directory if applies      |
-| `name`    | `string` | **Required**. Name of the folder  |
+| Parameter  | Type     | Description                       |
+| :--------  | :------- | :-------------------------------- |
+| `parent`   | `resobj` | json body of the parent wanted    |
+| `name`     | `string` | **Required**. Name of the folder  |
 
-##### Result: ID of the new element
-
+##### Result: created resource
 
 
 
