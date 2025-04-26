@@ -12,6 +12,7 @@ import (
 	"github.com/c4me-caro/drive/database"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 type Handler struct {
@@ -19,6 +20,7 @@ type Handler struct {
 }
 
 func NewHandler(db *database.DriveWorker) *Handler {
+	godotenv.Load()
 	return &Handler{
 		db: db,
 	}
@@ -93,7 +95,7 @@ func (h Handler) handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := "files/" + resource.Location
+	filePath := os.Getenv("FILES_ROOT") + "/" + resource.Location
 	fileBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -263,7 +265,7 @@ func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
 	var parent drive.Resource
 	json.Unmarshal(reqBody, &parent)
 	newUUID := uuid.New().String()
-	container := "files/"
+	container := ""
 
 	if parent.Name != "" {
 		err = h.db.CheckResource(parent)
@@ -358,7 +360,7 @@ func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fileName := fmt.Sprintf("%s_%s", newUUID, handler.Filename)
-	err = os.WriteFile(container+"/"+fileName, fileBytes, 0644)
+	err = os.WriteFile(os.Getenv("FILES_ROOT")+"/"+fileName, fileBytes, 0644)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "Error: Writing file")
