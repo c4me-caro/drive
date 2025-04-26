@@ -97,8 +97,6 @@ func (h Handler) handleFile(w http.ResponseWriter, r *http.Request) {
 
 	filePath := resource.Location
 	fileBytes, err := os.ReadFile(filePath)
-  fmt.Println(filePath)
-  fmt.Println(err)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "Error: file not found")
@@ -360,7 +358,6 @@ func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
 
 	fileName := fmt.Sprintf("%s_%s", newUUID, handler.Filename)
 	err = os.WriteFile(os.Getenv("FILES_ROOT")+"/"+fileName, fileBytes, 0644)
-  fmt.Println(err)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "Error: Writing file")

@@ -1,14 +1,16 @@
 package auth
 
 import (
-	"strings"
+	"sync"
 
 	"github.com/c4me-caro/drive"
 )
 
+var permissionCache sync.Map
+
 func FindPermission(user drive.User, access string, resource drive.Resource) string {
-	if user.Role == "admin" && resource.Id == "0" && access != "update" && access != "delete" {
-		return access + ":sys-all"
+	if resource.Id == "0" {
+		return handleSystemResource(user, access)
 	}
 
 	sharedPermission := access + ":" + user.Id + "-" + resource.Name
@@ -16,18 +18,18 @@ func FindPermission(user drive.User, access string, resource drive.Resource) str
 		return sharedPermission
 	}
 
-	candidates := []string{
-		access + ":" + resource.Name,
-		access + ":all",
-		"all:" + resource.Name,
-		"all:all",
-	}
+	candidates := make([]string, 0, 7)
+	candidates = append(candidates, access+":"+resource.Name)
+	candidates = append(candidates, access+":all")
+	candidates = append(candidates, "all:"+resource.Name)
 
 	if user.Id == resource.OwnerId {
-		candidates = append(candidates, access+":own-"+resource.Name)
-		candidates = append(candidates, access+":own-all")
+		candidates = append(candidates, access+"own-"+resource.Name)
+		candidates = append(candidates, access+"own-all")
 		candidates = append(candidates, "all:own-all")
 	}
+
+	candidates = append(candidates, "all:all")
 
 	for _, candidate := range candidates {
 		if validatePermission(user, candidate) {
@@ -38,14 +40,39 @@ func FindPermission(user drive.User, access string, resource drive.Resource) str
 	return ""
 }
 
-func validatePermission(user drive.User, access string) bool {
-	for _, permission := range user.Permissions {
-		if strings.EqualFold(permission, access) {
-			return true
+func handleSystemResource(user drive.User, access string) string {
+	if access == "read" {
+		if validatePermission(user, "read:sys-all") {
+			return "read:sys-all"
+		}
+
+		if validatePermission(user, "all:sys-all") {
+			return "all:sys-all"
 		}
 	}
 
-	return false
+	if user.Role == "admin" && (access == "create" || access == "update") {
+		return access + ":sys-all"
+	}
+
+	return ""
+}
+
+func validatePermission(user drive.User, access string) bool {
+	if cached, ok := permissionCache.Load(user.Id); ok {
+		permSet := cached.(map[string]struct{})
+		_, exists := permSet[access]
+		return exists
+	}
+
+	permSet := make(map[string]struct{})
+	for _, p := range user.Permissions {
+		permSet[p] = struct{}{}
+	}
+	permissionCache.Store(user.Id, permSet)
+
+	_, exists := permSet[access]
+	return exists
 }
 
 func searchSharedId(user drive.User, resource drive.Resource) bool {
