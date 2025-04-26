@@ -24,15 +24,61 @@ func NewHandler(db *database.DriveWorker) *Handler {
 	}
 }
 
+func (h Handler) checkResource(resname string, user drive.User, operation string) (drive.Resource, error) {
+	resource, err := h.db.GetResource(resname)
+	if err != nil {
+		return drive.Resource{}, err
+	}
+
+	permissions := auth.FindPermission(user, operation, resource)
+	if permissions == "" {
+		return drive.Resource{}, fmt.Errorf("user permission property not found")
+	}
+
+	return resource, nil
+}
+
+func (h Handler) validateAuthentication(r *http.Request, operation string) (drive.User, error) {
+	Authorization := r.Header.Get("Authorization")
+	if Authorization == "" {
+		return drive.User{}, fmt.Errorf("invalid token: %s", Authorization)
+	}
+
+	userId, err := auth.GetUserIdFromToken(Authorization)
+	if err != nil {
+		return drive.User{}, err
+	}
+
+	user, err := h.db.GetUserById(userId)
+	if err != nil {
+		return drive.User{}, err
+	}
+
+	_, err = h.checkResource("drive", user, operation)
+	if err != nil {
+		return drive.User{}, err
+	}
+
+	return user, nil
+}
+
 func (h Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/f/{file}", h.handleFile).Methods("GET")
-	router.HandleFunc("/r/{file}", h.handleDeleteFile).Methods("GET")
 	router.HandleFunc("/d/{folder}", h.handleFolder).Methods("GET")
-	router.HandleFunc("/upload", h.handleUpload).Methods("POST")
-	router.HandleFunc("/create", h.handleNewFolder).Methods("POST")
+	router.HandleFunc("/r/{file}", h.handleDeleteFile).Methods("GET")
+	router.HandleFunc("/rd/{folder}", h.handleDeleteFolder).Methods("GET")
+	router.HandleFunc("/create/{folder}", h.handleNewFolder).Methods("GET")
+	router.HandleFunc("/upload/{parent}", h.handleNewFile).Methods("POST")
 }
 
 func (h Handler) handleFile(w http.ResponseWriter, r *http.Request) {
+	user, err := h.validateAuthentication(r, "read")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Error: Unauthorized")
+		return
+	}
+
 	file := mux.Vars(r)["file"]
 	if file == "" {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -40,54 +86,10 @@ func (h Handler) handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// check for access permissions
-	Authorization := r.Header.Get("Authorization")
-	if Authorization == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Unauthorized")
-		return
-	}
-
-	userId, err := auth.GetUserIdFromToken(Authorization)
+	resource, err := h.checkResource(file, user, "read")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Unauthorized")
-		return
-	}
-
-	user, err := h.db.FindUser(userId)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding user")
-		return
-	}
-
-	resource, err := h.db.GetResource("drives")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding resource")
-		return
-	}
-
-	permissions := auth.FindPermission(user, "read", resource)
-	if permissions == "" {
-		w.WriteHeader(http.StatusForbidden)
-		io.WriteString(w, "Forbidden")
-		return
-	}
-
-	// Check if file exists
-	resource, err = h.db.GetResourceId(file)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding file")
-		return
-	}
-
-	permissions = auth.FindPermission(user, "read", resource)
-	if permissions == "" {
-		w.WriteHeader(http.StatusForbidden)
-		io.WriteString(w, "Forbidden")
+		io.WriteString(w, "Error: Unauthorized")
 		return
 	}
 
@@ -95,7 +97,7 @@ func (h Handler) handleFile(w http.ResponseWriter, r *http.Request) {
 	fileBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error reading file")
+		io.WriteString(w, "Error: file not found")
 		return
 	}
 
@@ -105,7 +107,49 @@ func (h Handler) handleFile(w http.ResponseWriter, r *http.Request) {
 	w.Write(fileBytes)
 }
 
+func (h Handler) handleFolder(w http.ResponseWriter, r *http.Request) {
+	user, err := h.validateAuthentication(r, "read")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Error: Unauthorized")
+		return
+	}
+
+	folder := mux.Vars(r)["folder"]
+	if folder == "" {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Error: No folder specified")
+		return
+	}
+
+	resource, err := h.checkResource(folder, user, "read")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Error: Unauthorized")
+		return
+	}
+
+	if resource.Type != "folder" {
+		w.WriteHeader(http.StatusConflict)
+		io.WriteString(w, "Error: resource is not a folder")
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(resource.Content); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Error: bad json coding")
+		return
+	}
+}
+
 func (h Handler) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
+	user, err := h.validateAuthentication(r, "delete")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Error: Unauthorized")
+		return
+	}
+
 	file := mux.Vars(r)["file"]
 	if file == "" {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -113,119 +157,183 @@ func (h Handler) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// check for access permissions
-	Authorization := r.Header.Get("Authorization")
-	if Authorization == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Unauthorized")
-		return
-	}
-
-	userId, err := auth.GetUserIdFromToken(Authorization)
+	resource, err := h.checkResource(file, user, "delete")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Unauthorized")
+		io.WriteString(w, "Error: Unauthorized")
 		return
 	}
 
-	user, err := h.db.FindUser(userId)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding user")
-		return
-	}
-
-	resource, err := h.db.GetResource("drives")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding resource")
-		return
-	}
-
-	permissions := auth.FindPermission(user, "update", resource)
-	if permissions == "" {
-		w.WriteHeader(http.StatusForbidden)
-		io.WriteString(w, "Forbidden")
-		return
-	}
-
-	// Check if file exists
-	resource, err = h.db.GetResourceId(file)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding file")
-		return
-	}
-
-	permissions = auth.FindPermission(user, "delete", resource)
-	if permissions == "" {
-		w.WriteHeader(http.StatusForbidden)
-		io.WriteString(w, "Forbidden")
-		return
-	}
-
-	if resource.Type == "folder" && len(resource.Content) != 0 {
+	if resource.Type != "file" {
 		w.WriteHeader(http.StatusConflict)
-		io.WriteString(w, "Error: Folder not empty")
+		io.WriteString(w, "Error: Resource is not a file")
 		return
 	}
 
 	err = h.db.DeleteResource(resource)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error trying to remove file")
-		return
-	}
-
-	err = h.db.RemoveFileResource(resource.Id)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error trying to remove file")
+		io.WriteString(w, "Error: resource cannot be deleted")
 		return
 	}
 
 	io.WriteString(w, "File removed")
 }
 
-func (h Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
-	// check for access permissions
-	Authorization := r.Header.Get("Authorization")
-	if Authorization == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Unauthorized")
-		return
-	}
-
-	userId, err := auth.GetUserIdFromToken(Authorization)
+func (h Handler) handleDeleteFolder(w http.ResponseWriter, r *http.Request) {
+	user, err := h.validateAuthentication(r, "delete")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Unauthorized")
+		io.WriteString(w, "Error: Unauthorized")
 		return
 	}
 
-	user, err := h.db.FindUser(userId)
+	folder := mux.Vars(r)["folder"]
+	if folder == "" {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Error: No folder specified")
+		return
+	}
+
+	resource, err := h.checkResource(folder, user, "delete")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Error: Unauthorized")
+		return
+	}
+
+	if resource.Type != "folder" {
+		w.WriteHeader(http.StatusConflict)
+		io.WriteString(w, "Error: Resource is not a folder")
+		return
+	}
+
+	recursive := r.URL.Query().Get("recursive")
+	childrens := len(resource.Content)
+
+	if childrens != 0 && recursive == "false" {
+		w.WriteHeader(http.StatusConflict)
+		io.WriteString(w, "Error: Folder not empty")
+	}
+
+	deletionCounter := 0
+	if recursive == "true" {
+		for _, rsx := range resource.Content {
+
+			res, err := h.checkResource(rsx, user, "delete")
+			if err != nil {
+				deletionCounter++
+				continue
+			}
+
+			err = h.db.DeleteResource(res)
+			if err != nil {
+				deletionCounter++
+				continue
+			}
+		}
+	}
+
+	err = h.db.DeleteResource(resource)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding user")
+		io.WriteString(w, fmt.Sprintf("Error: resource cannot be deleted. Deleted children: %d", deletionCounter))
 		return
 	}
 
-	resource, err := h.db.GetResource("drives")
+	io.WriteString(w, fmt.Sprintf("Folder removed. Deleted children: %d", deletionCounter))
+}
+
+func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
+	user, err := h.validateAuthentication(r, "create")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Error: Unauthorized")
+		return
+	}
+
+	folder := mux.Vars(r)["folder"]
+	if folder == "" {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Error: No folder specified")
+		return
+	}
+
+	reqBody, _ := io.ReadAll(r.Body)
+	var parent drive.Resource
+	json.Unmarshal(reqBody, &parent)
+	newUUID := uuid.New().String()
+
+	if parent.Name != "" {
+		err = h.db.CheckResource(parent)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			io.WriteString(w, "Error: Unauthorized")
+			return
+		}
+
+		permissions := auth.FindPermission(user, "update", parent)
+		if permissions == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			io.WriteString(w, "Error: Unauthorized")
+			return
+		}
+
+		err = h.db.AddResourceChildren(parent, newUUID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			io.WriteString(w, "Error: Failed parent update")
+			return
+		}
+	}
+
+	var body drive.Resource
+
+	body.Id = newUUID
+	body.Name = folder
+	body.OwnerId = user.Id
+	body.SharedId = []string{}
+	body.Location = parent.Name
+	body.Type = "folder"
+	body.Content = []string{}
+
+	err = h.db.CreateResource(body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding resource")
-		return
+		io.WriteString(w, "Error: Failed resource creation")
 	}
 
-	permissions := auth.FindPermission(user, "create", resource)
-	if permissions == "" {
-		w.WriteHeader(http.StatusForbidden)
-		io.WriteString(w, "Forbidden")
+	io.WriteString(w, body.Id)
+}
+
+func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
+	user, err := h.validateAuthentication(r, "create")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Error: Unauthorized")
 		return
 	}
 
 	newUUID := uuid.New().String()
-	body := drive.Resource{}
+	container := "files/"
+	parent := mux.Vars(r)["parent"]
+	if parent != "" {
+		resource, err := h.checkResource(parent, user, "update")
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			io.WriteString(w, "Error: Unauthorized")
+			return
+		}
+
+		err = h.db.AddResourceChildren(resource, newUUID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			io.WriteString(w, "Error: Failed parent update")
+			return
+		}
+
+		container = container + resource.Name
+	}
 
 	r.ParseMultipartForm(10 << 20)
 	file, handler, err := r.FormFile("file")
@@ -233,23 +341,6 @@ func (h Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "Error: File not found")
 		return
-	}
-
-	parent := r.FormValue("parent")
-	if parent != "" {
-		resource, err = h.db.GetResourceId(parent)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			io.WriteString(w, "Error: Finding parent resource")
-			return
-		}
-
-		err = h.db.UpdateFolderContent(resource, newUUID)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			io.WriteString(w, "Error: Updating parent resource")
-			return
-		}
 	}
 
 	fileBytes, err := io.ReadAll(file)
@@ -260,170 +351,28 @@ func (h Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fileName := fmt.Sprintf("%s_%s", newUUID, handler.Filename)
-
-	err = os.WriteFile("files/"+fileName, fileBytes, 0644)
+	err = os.WriteFile(container+"/"+fileName, fileBytes, 0644)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "Error: Writing file")
 		return
 	}
 
-	body.Id = newUUID
-	body.Name = handler.Filename
-	body.OwnerId = userId
-	body.SharedId = []string{}
-	body.Type = "file"
-	body.Location = fileName
-
-	h.db.CreateResource(body)
-	io.WriteString(w, body.Id)
-}
-
-func (h Handler) handleFolder(w http.ResponseWriter, r *http.Request) {
-	folder := mux.Vars(r)["folder"]
-	if folder == "" {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error: No file specified")
-		return
-	}
-
-	// check for access permissions
-	Authorization := r.Header.Get("Authorization")
-	if Authorization == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Unauthorized")
-		return
-	}
-
-	userId, err := auth.GetUserIdFromToken(Authorization)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Unauthorized")
-		return
-	}
-
-	user, err := h.db.FindUser(userId)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding user")
-		return
-	}
-
-	resource, err := h.db.GetResource("drives")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding resource")
-		return
-	}
-
-	permissions := auth.FindPermission(user, "read", resource)
-	if permissions == "" {
-		w.WriteHeader(http.StatusForbidden)
-		io.WriteString(w, "Forbidden")
-		return
-	}
-
-	// Check if folder exists
-	resource, err = h.db.GetResourceId(folder)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding file")
-		return
-	}
-
-	permissions = auth.FindPermission(user, "read", resource)
-	if permissions == "" {
-		w.WriteHeader(http.StatusForbidden)
-		io.WriteString(w, "Forbidden")
-		return
-	}
-
-	if resource.Type == "file" {
-		w.WriteHeader(http.StatusConflict)
-		io.WriteString(w, "Resource is a file")
-		return
-	}
-
-	if err := json.NewEncoder(w).Encode(resource.Content); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error coding response")
-		return
-	}
-
-}
-
-func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
-	// check for access permissions
-	Authorization := r.Header.Get("Authorization")
-	if Authorization == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Unauthorized")
-		return
-	}
-
-	userId, err := auth.GetUserIdFromToken(Authorization)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Unauthorized")
-		return
-	}
-
-	user, err := h.db.FindUser(userId)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding user")
-		return
-	}
-
-	resource, err := h.db.GetResource("drives")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error finding resource")
-		return
-	}
-
-	permissions := auth.FindPermission(user, "create", resource)
-	if permissions == "" {
-		w.WriteHeader(http.StatusForbidden)
-		io.WriteString(w, "Forbidden")
-		return
-	}
-
-	name := r.FormValue("name")
-	if name == "" {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error: No folder name specified")
-		return
-	}
-
-	newUUID := uuid.New().String()
 	var body drive.Resource
 
-	parent := r.FormValue("parent")
-	if parent != "" {
-		resource, err = h.db.GetResourceId(parent)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			io.WriteString(w, "Error: Finding parent resource")
-			return
-		}
-
-		err = h.db.UpdateFolderContent(resource, newUUID)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			io.WriteString(w, "Error: Updating parent resource")
-			return
-		}
-	}
-
 	body.Id = newUUID
-	body.Name = name
-	body.OwnerId = userId
+	body.Name = fileName
+	body.OwnerId = user.Id
 	body.SharedId = []string{}
-	body.Location = ""
-	body.Type = "folder"
+	body.Location = container
+	body.Type = "file"
 	body.Content = []string{}
 
-	h.db.CreateResource(body)
+	err = h.db.CreateResource(body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Error: Failed resource creation")
+	}
+
 	io.WriteString(w, body.Id)
 }

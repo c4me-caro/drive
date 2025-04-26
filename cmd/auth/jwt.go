@@ -5,16 +5,26 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"os"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/joho/godotenv"
 )
 
 var secret = []byte("RVBIYURVQOB/V%#QB")
 var revokedTokens []string
 
+func init() {
+	godotenv.Load()
+	msecret := os.Getenv("JWT_SECRET")
+	if msecret != "" {
+		secret = []byte(msecret)
+	}
+}
+
 func CreateJWT(userId string) (string, error) {
 	claims := &jwt.MapClaims{
-		"autorized": true,
+		"authorized": true,
 		"user_id":   userId,
 		"exp":       time.Now().Add(time.Hour * 72).Unix(),
 	}
@@ -64,7 +74,7 @@ func ValidateJWT(token string) (*jwt.Token, error) {
 	if token != "" {
 		tk, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("método de firma inesperado: %v", t.Header["alg"])
+				return nil, fmt.Errorf("sign method not allowed: %v", t.Header["alg"])
 			}
 			return secret, nil
 		})
@@ -78,11 +88,10 @@ func ValidateJWT(token string) (*jwt.Token, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("token no valido")
+	return nil, fmt.Errorf("invalid token: %s", token)
 }
 
 func InvalidateToken(token string) error {
-	// invalidate token
 	_, err := ValidateJWT(token)
 	if err != nil {
 		return err

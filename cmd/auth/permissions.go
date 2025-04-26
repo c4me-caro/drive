@@ -7,7 +7,7 @@ import (
 )
 
 func FindPermission(user drive.User, access string, resource drive.Resource) string {
-	if user.Role == "admin" && resource.OwnerId == "0" && access != "update" && access != "delete" {
+	if user.Role == "admin" && resource.Id == "0" && access != "update" && access != "delete" {
 		return access + ":sys-all"
 	}
 

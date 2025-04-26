@@ -11,166 +11,145 @@ import (
 )
 
 type DriveWorker struct {
-	client     *mongo.Client
-	db         string
-	collection string
-}
-type Document struct {
-	ID        string           `bson:"_id"`
-	Users     []drive.User     `bson:"users"`
-	Resources []drive.Resource `bson:"resources"`
+	client *mongo.Client
+	db     string
 }
 
-func NewDriveWorker(c *mongo.Client, db string, collection string) *DriveWorker {
+func NewDriveWorker(c *mongo.Client, db string) *DriveWorker {
 	return &DriveWorker{
-		client:     c,
-		db:         db,
-		collection: collection,
+		client: c,
+		db:     db,
 	}
 }
 
-func (cfw *DriveWorker) RemoveFileResource(parent string) error {
-	coll := cfw.client.Database(cfw.db).Collection(cfw.collection)
-	filter := bson.M{"resources.content": bson.M{"$exists": true}}
-	update := bson.M{"$pull": bson.M{"resources.$.content": parent}}
+func (cfw *DriveWorker) AddResourceChildren(resource drive.Resource, children string) error {
+	if resource.Id == "0" {
+		return fmt.Errorf("system update forbiden")
+	}
+
+	coll := cfw.client.Database(cfw.db).Collection("resources")
+	filter := bson.M{"id": resource.Id, "name": resource.Name}
+	update := bson.M{
+		"$push": bson.M{"resource.$.content": children},
+	}
+
 	_, err := coll.UpdateOne(context.TODO(), filter, update)
 	if err != nil {
-		return fmt.Errorf("error updating resource: %v", err)
+		return err
 	}
 
 	return nil
 }
 
-func (cfw *DriveWorker) UpdateFolderContent(res drive.Resource, newId string) error {
-	coll := cfw.client.Database(cfw.db).Collection(cfw.collection)
-	filter := bson.M{"resources": res}
-	update := bson.M{"$push": bson.M{"resources.$.content": newId}}
-	_, err := coll.UpdateOne(context.TODO(), filter, update)
+func (cfw *DriveWorker) CheckResource(resource drive.Resource) error {
+	if resource.Id == "0" {
+		return fmt.Errorf("system check forbiden")
+	}
+
+	coll := cfw.client.Database(cfw.db).Collection("resources")
+	filter := bson.M{"id": resource.Id, "name": resource.Name}
+
+	_, err := coll.Find(context.TODO(), filter)
 	if err != nil {
-		return fmt.Errorf("error updating resource: %v", err)
+		return err
 	}
 
 	return nil
 }
 
-func (cfw *DriveWorker) DeleteResource(res drive.Resource) error {
-	coll := cfw.client.Database(cfw.db).Collection(cfw.collection)
-	filter := bson.M{"resources": bson.M{"$exists": true}}
-	update := bson.M{"$pull": bson.M{"resources": res}}
-	_, err := coll.UpdateOne(context.TODO(), filter, update)
+func (cfw *DriveWorker) GetResource(search string) (drive.Resource, error) {
+	coll := cfw.client.Database(cfw.db).Collection("resources")
+	cursor, err := coll.Find(context.TODO(), bson.D{})
 	if err != nil {
-		return fmt.Errorf("error removing resource: %v", err)
+		return drive.Resource{}, err
 	}
 
-	return nil
-}
-
-func (cfw *DriveWorker) CreateResource(res drive.Resource) error {
-	coll := cfw.client.Database(cfw.db).Collection(cfw.collection)
-	filter := bson.M{"resources": bson.M{"$exists": true}}
-	update := bson.M{"$push": bson.M{"resources": res}}
-	_, err := coll.UpdateOne(context.TODO(), filter, update)
-	if err != nil {
-		return fmt.Errorf("error adding resource: %v", err)
-	}
-
-	return nil
-}
-
-func (cfw *DriveWorker) GetUser(username string, password string) (string, error) {
-	coll := cfw.client.Database(cfw.db).Collection(cfw.collection)
-	cursor, err := coll.Find(context.TODO(), bson.M{})
-	if err != nil {
-		return "", err
-	}
+	defer cursor.Close(context.TODO())
 
 	for cursor.Next(context.TODO()) {
-		var doc Document
-		err := cursor.Decode(&doc)
-		if err != nil {
-			return "", err
+		var resource drive.Resource
+		if err := cursor.Decode(&resource); err != nil {
+			return drive.Resource{}, err
 		}
 
-		for _, user := range doc.Users {
-			if user.Name == username && user.Password == password {
-				return user.Id, nil
-			}
+		if resource.Name == search {
+			return resource, nil
 		}
 	}
 
-	return "", fmt.Errorf("user not found")
+	return drive.Resource{}, fmt.Errorf("resource not found: %s", search)
 }
 
-func (cfw *DriveWorker) FindUser(id string) (drive.User, error) {
-	coll := cfw.client.Database(cfw.db).Collection(cfw.collection)
-	cursor, err := coll.Find(context.TODO(), bson.M{})
+func (cfw *DriveWorker) CreateResource(resource drive.Resource) error {
+	coll := cfw.client.Database(cfw.db).Collection("resources")
+	_, err := coll.InsertOne(context.TODO(), resource)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cfw *DriveWorker) DeleteResource(resource drive.Resource) error {
+	if resource.Id == "0" {
+		return fmt.Errorf("system deletion forbiden")
+	}
+
+	coll := cfw.client.Database(cfw.db).Collection("resources")
+	filter := bson.M{"id": resource.Id, "name": resource.Name}
+
+	_, err := coll.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cfw *DriveWorker) GetUserById(userid string) (drive.User, error) {
+	coll := cfw.client.Database(cfw.db).Collection("users")
+	cursor, err := coll.Find(context.TODO(), bson.D{})
 	if err != nil {
 		return drive.User{}, err
 	}
 
+	defer cursor.Close(context.TODO())
+
 	for cursor.Next(context.TODO()) {
-		var doc Document
-		err := cursor.Decode(&doc)
-		if err != nil {
+		var user drive.User
+		if err := cursor.Decode(&user); err != nil {
 			return drive.User{}, err
 		}
 
-		for _, user := range doc.Users {
-			if user.Id == id {
-				return user, nil
-			}
+		if user.Id == userid {
+			return user, nil
 		}
 	}
 
-	return drive.User{}, fmt.Errorf("user not found")
+	return drive.User{}, fmt.Errorf("userid not found: %s", userid)
 }
 
-func (cfw *DriveWorker) GetResource(resName string) (drive.Resource, error) {
-	coll := cfw.client.Database(cfw.db).Collection(cfw.collection)
-	cursor, err := coll.Find(context.TODO(), bson.M{})
+func (cfw *DriveWorker) GetUser(username string, password string) (drive.User, error) {
+	coll := cfw.client.Database(cfw.db).Collection("users")
+	cursor, err := coll.Find(context.TODO(), bson.D{})
 	if err != nil {
-		return drive.Resource{}, err
+		return drive.User{}, err
 	}
+
+	defer cursor.Close(context.TODO())
 
 	for cursor.Next(context.TODO()) {
-		var doc Document
-		err := cursor.Decode(&doc)
-		if err != nil {
-			return drive.Resource{}, err
+		var user drive.User
+		if err := cursor.Decode(&user); err != nil {
+			return drive.User{}, err
 		}
 
-		for _, res := range doc.Resources {
-			if res.Name == resName {
-				return res, nil
-			}
+		if user.Name == username && user.Password == password {
+			return user, nil
 		}
 	}
 
-	return drive.Resource{}, fmt.Errorf("resource not found")
-}
-
-func (cfw *DriveWorker) GetResourceId(id string) (drive.Resource, error) {
-	coll := cfw.client.Database(cfw.db).Collection(cfw.collection)
-	cursor, err := coll.Find(context.TODO(), bson.M{})
-	if err != nil {
-		return drive.Resource{}, err
-	}
-
-	for cursor.Next(context.TODO()) {
-		var doc Document
-		err := cursor.Decode(&doc)
-		if err != nil {
-			return drive.Resource{}, err
-		}
-
-		for _, res := range doc.Resources {
-			if res.Id == id {
-				return res, nil
-			}
-		}
-	}
-
-	return drive.Resource{}, fmt.Errorf("resource not found")
+	return drive.User{}, fmt.Errorf("authuser not found: %s", username)
 }
 
 func (cfw *DriveWorker) Start() error {
