@@ -67,7 +67,7 @@ func (h Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/d/{folder}", h.handleFolder).Methods("GET")
 	router.HandleFunc("/r/{file}", h.handleDeleteFile).Methods("GET")
 	router.HandleFunc("/rd/{folder}", h.handleDeleteFolder).Methods("GET")
-	router.HandleFunc("/create/{folder}", h.handleNewFolder).Methods("GET")
+	router.HandleFunc("/create/{folder}", h.handleNewFolder).Methods("POST")
 	router.HandleFunc("/upload/{parent}", h.handleNewFile).Methods("POST")
 }
 
@@ -263,6 +263,7 @@ func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
 	var parent drive.Resource
 	json.Unmarshal(reqBody, &parent)
 	newUUID := uuid.New().String()
+	container := "files/"
 
 	if parent.Name != "" {
 		err = h.db.CheckResource(parent)
@@ -285,6 +286,8 @@ func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, "Error: Failed parent update")
 			return
 		}
+
+		container = container + parent.Name
 	}
 
 	var body drive.Resource
@@ -293,7 +296,7 @@ func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
 	body.Name = folder
 	body.OwnerId = user.Id
 	body.SharedId = []string{}
-	body.Location = parent.Name
+	body.Location = container
 	body.Type = "folder"
 	body.Content = []string{}
 

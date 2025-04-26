@@ -2,10 +2,11 @@ package auth
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
-	"os"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
@@ -25,8 +26,8 @@ func init() {
 func CreateJWT(userId string) (string, error) {
 	claims := &jwt.MapClaims{
 		"authorized": true,
-		"user_id":   userId,
-		"exp":       time.Now().Add(time.Hour * 72).Unix(),
+		"user_id":    userId,
+		"exp":        time.Now().Add(time.Hour * 72).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -55,14 +56,16 @@ func HandleAuthorization(next http.Handler) http.Handler {
 
 			for _, revokedToken := range revokedTokens {
 				if token == revokedToken {
-					http.Redirect(w, r, "/", http.StatusUnauthorized)
+					w.WriteHeader(http.StatusUnauthorized)
+					io.WriteString(w, "Error: Unauthorized")
 					return
 				}
 			}
 
 			_, err := ValidateJWT(token)
 			if err != nil {
-				http.Redirect(w, r, "/", http.StatusUnauthorized)
+				w.WriteHeader(http.StatusUnauthorized)
+				io.WriteString(w, "Error: Unauthorized")
 				return
 			}
 
