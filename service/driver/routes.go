@@ -95,8 +95,10 @@ func (h Handler) handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := os.Getenv("FILES_ROOT") + "/" + resource.Location
+	filePath := resource.Location
 	fileBytes, err := os.ReadFile(filePath)
+  fmt.Println(filePath)
+  fmt.Println(err)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "Error: file not found")
@@ -289,7 +291,7 @@ func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		container = container + parent.Name
+		container = parent.Name
 	}
 
 	var body drive.Resource
@@ -324,7 +326,6 @@ func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newUUID := uuid.New().String()
-	container := "files/"
 	parent := mux.Vars(r)["parent"]
 	if parent != "" {
 		resource, err := h.checkResource(parent, user, "update")
@@ -340,8 +341,6 @@ func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
 			io.WriteString(w, "Error: Failed parent update")
 			return
 		}
-
-		container = container + resource.Name
 	}
 
 	r.ParseMultipartForm(10 << 20)
@@ -361,6 +360,7 @@ func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
 
 	fileName := fmt.Sprintf("%s_%s", newUUID, handler.Filename)
 	err = os.WriteFile(os.Getenv("FILES_ROOT")+"/"+fileName, fileBytes, 0644)
+  fmt.Println(err)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "Error: Writing file")
@@ -373,7 +373,7 @@ func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
 	body.Name = fileName
 	body.OwnerId = user.Id
 	body.SharedId = []string{}
-	body.Location = container
+	body.Location = os.Getenv("FILES_ROOT") + "/" + fileName
 	body.Type = "file"
 	body.Content = []string{}
 

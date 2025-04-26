@@ -1,0 +1,16 @@
+# ***drive-api.service***
+[Unit]
+Description=driveAppi
+After=multi-user.target
+
+[Service]
+Type=simple
+EXecStart=/home/c4mec/apps/drive/main
+User=c4mec
+WorkingDirectory=/home/c4mec/apps/drive
+Restart=on-failure
+StandardOutput=syslog
+StandardError=syslog
+
+[Install]
+WantedBy=multi-user.target
