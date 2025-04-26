@@ -11,7 +11,7 @@ func FindPermission(user drive.User, access string, resource drive.Resource) str
 		return access + ":sys-all"
 	}
 
-	sharedPermission := access + ":" + resource.Id + "-" + resource.Name
+	sharedPermission := access + ":" + user.Id + "-" + resource.Name
 	if validatePermission(user, sharedPermission) && searchSharedId(user, resource) {
 		return sharedPermission
 	}

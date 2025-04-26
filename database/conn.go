@@ -30,7 +30,7 @@ func (cfw *DriveWorker) AddResourceChildren(resource drive.Resource, children st
 	coll := cfw.client.Database(cfw.db).Collection("resources")
 	filter := bson.M{"id": resource.Id, "name": resource.Name}
 	update := bson.M{
-		"$push": bson.M{"resource.$.content": children},
+		"$push": bson.M{"resource.content": children},
 	}
 
 	_, err := coll.UpdateOne(context.TODO(), filter, update)
