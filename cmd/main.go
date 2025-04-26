@@ -24,7 +24,8 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-
+  
+  fmt.Printf("Server running on: %s", os.Getenv("ADDRESS"))
 	server := api.NewApiServer(os.Getenv("ADDRESS"), worker)
 	if err := server.Run(); err != nil {
 		fmt.Println(err)
