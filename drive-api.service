@@ -5,9 +5,9 @@ After=multi-user.target
 
 [Service]
 Type=simple
-EXecStart=/home/c4mec/apps/drive/main
+EXecStart=go generated binary
 User=root
-WorkingDirectory=/home/c4mec/apps/drive
+WorkingDirectory=your working directory
 Restart=on-failure
 StandardOutput=syslog
 StandardError=syslog
