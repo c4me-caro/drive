@@ -72,7 +72,7 @@ func (cfw *DriveWorker) GetResource(search string) (drive.Resource, error) {
 			return drive.Resource{}, err
 		}
 
-		if resource.Name == search {
+		if resource.Name == search || resource.Id == search {
 			return resource, nil
 		}
 	}

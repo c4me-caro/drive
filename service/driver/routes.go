@@ -135,7 +135,7 @@ func (h Handler) handleFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(resource.Content); err != nil {
+	if err := json.NewEncoder(w).Encode(resource); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "Error: bad json coding")
 		return
@@ -306,7 +306,11 @@ func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "Error: Failed resource creation")
 	}
 
-	io.WriteString(w, body.Id)
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Error: bad json coding")
+		return
+	}
 }
 
 func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
@@ -377,5 +381,9 @@ func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "Error: Failed resource creation")
 	}
 
-	io.WriteString(w, body.Id)
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Error: bad json coding")
+		return
+	}
 }
