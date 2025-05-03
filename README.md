@@ -11,7 +11,7 @@ Download this project.
 Install the Drive API with go
 
 ```bash
-  go mod download
+  go mod tidy
   go build cmd/main.go
 ```
 
@@ -70,6 +70,15 @@ Run the following commands
 ```
 
 ##### Result: JWT token or error
+
+
+#### Get service API Key
+
+```http
+  GET /newApiKey
+```
+
+##### Result: API Key string
 
 
 #### Get file
