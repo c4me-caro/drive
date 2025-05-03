@@ -153,7 +153,6 @@ func (cfw *DriveWorker) GetUser(username string, password string) (drive.User, e
 }
 
 func (cfw *DriveWorker) Start() error {
-	// Verificar la conexión
 	err := cfw.client.Ping(context.TODO(), nil)
 	if err != nil {
 		return err

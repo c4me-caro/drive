@@ -83,7 +83,7 @@ func (h Handler) handleFile(w http.ResponseWriter, r *http.Request) {
 
 	file := mux.Vars(r)["file"]
 	if file == "" {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, "Error: No file specified")
 		return
 	}
@@ -119,7 +119,7 @@ func (h Handler) handleFolder(w http.ResponseWriter, r *http.Request) {
 
 	folder := mux.Vars(r)["folder"]
 	if folder == "" {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, "Error: No folder specified")
 		return
 	}
@@ -154,7 +154,7 @@ func (h Handler) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 
 	file := mux.Vars(r)["file"]
 	if file == "" {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, "Error: No file specified")
 		return
 	}
@@ -192,7 +192,7 @@ func (h Handler) handleDeleteFolder(w http.ResponseWriter, r *http.Request) {
 
 	folder := mux.Vars(r)["folder"]
 	if folder == "" {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, "Error: No folder specified")
 		return
 	}
@@ -256,7 +256,7 @@ func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
 
 	folder := mux.Vars(r)["folder"]
 	if folder == "" {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, "Error: No folder specified")
 		return
 	}
@@ -328,7 +328,7 @@ func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
 	if parent != "" {
 		resource, err := h.checkResource(parent, user, "update")
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusUnauthorized)
 			io.WriteString(w, "Error: Unauthorized")
 			return
 		}

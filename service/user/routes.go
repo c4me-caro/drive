@@ -22,8 +22,34 @@ func NewHandler(db *database.DriveWorker) *Handler {
 
 func (h Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/login", h.handleLogin).Methods("POST")
+	router.HandleFunc("/newApiKey", h.handleNewApiKey).Methods("POST")
 	router.HandleFunc("/validateUser", h.handleValidUser).Methods("GET")
 	router.HandleFunc("/logout", h.handleLogout).Methods("GET")
+}
+
+func (h Handler) handleNewApiKey(w http.ResponseWriter, r *http.Request) {
+	Authorization := r.Header.Get("Authorization")
+	if Authorization == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Error: Unauthorized")
+		return
+	}
+
+	userId, err := auth.GetUserIdFromToken(Authorization)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, "Error: Unauthorized")
+		return
+	}
+
+	str, err := auth.CreateApiKey(userId, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Error: Key generation failed")
+		return
+	}
+
+	io.WriteString(w, str)
 }
 
 func (h Handler) handleValidUser(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +87,6 @@ func (h Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var body test_struct
 	json.Unmarshal(reqBody, &body)
 
-	// validate login credentials
 	user, err := h.db.GetUser(body.Username, body.Password)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -69,7 +94,6 @@ func (h Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// generate access token
 	token, err := auth.CreateJWT(user.Id)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -81,7 +105,6 @@ func (h Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
-	// invalidate token
 	auth.InvalidateToken(r.Header.Get("Authorization"))
 	io.WriteString(w, "Logout successfully")
 }
