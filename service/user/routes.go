@@ -22,7 +22,7 @@ func NewHandler(db *database.DriveWorker) *Handler {
 
 func (h Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/login", h.handleLogin).Methods("POST")
-	router.HandleFunc("/newApiKey", h.handleNewApiKey).Methods("POST")
+	router.HandleFunc("/newApiKey", h.handleNewApiKey).Methods("GET")
 	router.HandleFunc("/validateUser", h.handleValidUser).Methods("GET")
 	router.HandleFunc("/logout", h.handleLogout).Methods("GET")
 }

@@ -65,6 +65,14 @@ func validateApiKey(key string, userId string) bool {
 func HandleApiKey(next http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
+			URLS := []string{"/login", "/logout"}
+			skip_urls := strings.Join(URLS, " ")
+
+			if strings.Contains(skip_urls, r.URL.String()) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			token := r.Header.Get("Authorization")
 			userId, err := GetUserIdFromToken(token)
 			if err != nil {
