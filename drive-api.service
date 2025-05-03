@@ -5,9 +5,9 @@ After=multi-user.target
 
 [Service]
 Type=simple
-EXecStart=go generated binary
+EXecStart={go generated binary}
 User=root
-WorkingDirectory=your working directory
+WorkingDirectory={your working directory}
 Restart=on-failure
 StandardOutput=syslog
 StandardError=syslog
