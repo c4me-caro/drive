@@ -33,7 +33,7 @@ func (s *APIServer) Run() error {
 	driverHandler.RegisterRoutes(subrouter)
 
 	router.Use(auth.HandleAuthorization)
-	router.Use(auth.HandleApiKey)
+	// router.Use(auth.HandleApiKey)
 
 	service := &http.Server{
 		Handler: router,
