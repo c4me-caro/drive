@@ -5,7 +5,7 @@ After=multi-user.target
 
 [Service]
 Type=simple
-EXecStart={go generated binary}
+ExecStart={go generated binary}
 User=root
 WorkingDirectory={your working directory}
 Restart=on-failure
