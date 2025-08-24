@@ -77,7 +77,7 @@ func (h Handler) handleFile(w http.ResponseWriter, r *http.Request) {
 	user, err := h.validateAuthentication(r, "read")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: User not found or does not has valid permissions: " + err.Error())
 		return
 	}
 
@@ -91,7 +91,7 @@ func (h Handler) handleFile(w http.ResponseWriter, r *http.Request) {
 	resource, err := h.checkResource(file, user, "read")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: Resource not found or user has no valid permissions: " + err.Error())
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h Handler) handleFolder(w http.ResponseWriter, r *http.Request) {
 	user, err := h.validateAuthentication(r, "read")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: User not found or does not has valid permissions: " + err.Error())
 		return
 	}
 
@@ -127,7 +127,7 @@ func (h Handler) handleFolder(w http.ResponseWriter, r *http.Request) {
 	resource, err := h.checkResource(folder, user, "read")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: Resource not found or user has no valid permissions: " + err.Error())
 		return
 	}
 
@@ -148,7 +148,7 @@ func (h Handler) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	user, err := h.validateAuthentication(r, "delete")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: User not found or does not has valid permissions: " + err.Error())
 		return
 	}
 
@@ -162,7 +162,7 @@ func (h Handler) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	resource, err := h.checkResource(file, user, "delete")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: Resource not found or user has no valid permissions: " + err.Error())
 		return
 	}
 
@@ -186,7 +186,7 @@ func (h Handler) handleDeleteFolder(w http.ResponseWriter, r *http.Request) {
 	user, err := h.validateAuthentication(r, "delete")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: User not found or does not has valid permissions: " + err.Error())
 		return
 	}
 
@@ -200,7 +200,7 @@ func (h Handler) handleDeleteFolder(w http.ResponseWriter, r *http.Request) {
 	resource, err := h.checkResource(folder, user, "delete")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: Resource not found or user has no valid permissions: " + err.Error())
 		return
 	}
 
@@ -250,7 +250,7 @@ func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
 	user, err := h.validateAuthentication(r, "create")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: User not found or does not has valid permissions: " + err.Error())
 		return
 	}
 
@@ -271,14 +271,14 @@ func (h Handler) handleNewFolder(w http.ResponseWriter, r *http.Request) {
 		err = h.db.CheckResource(parent)
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "Error: Unauthorized")
+			io.WriteString(w, "Error: Resource not found or user has no valid permissions: " + err.Error())
 			return
 		}
 
 		permissions := auth.FindPermission(user, "update", parent)
 		if permissions == "" {
 			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "Error: Unauthorized")
+			io.WriteString(w, "Error: User has no valid permissions: " + err.Error())
 			return
 		}
 
@@ -319,7 +319,7 @@ func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
 	user, err := h.validateAuthentication(r, "create")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: User not found or does not has valid permissions: " + err.Error())
 		return
 	}
 
@@ -329,7 +329,7 @@ func (h Handler) handleNewFile(w http.ResponseWriter, r *http.Request) {
 		resource, err := h.checkResource(parent, user, "update")
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
-			io.WriteString(w, "Error: Unauthorized")
+			io.WriteString(w, "Error: Resource not found or user has no valid permissions: " + err.Error())
 			return
 		}
 

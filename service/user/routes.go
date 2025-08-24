@@ -31,21 +31,21 @@ func (h Handler) handleNewApiKey(w http.ResponseWriter, r *http.Request) {
 	Authorization := r.Header.Get("Authorization")
 	if Authorization == "" {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: No authorization header: " + Authorization)
 		return
 	}
 
 	userId, err := auth.GetUserIdFromToken(Authorization)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: User not authorized: " + err.Error())
 		return
 	}
 
 	str, err := auth.CreateApiKey(userId, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "Error: Key generation failed")
+		io.WriteString(w, "Error: Key generation failed: " + err.Error())
 		return
 	}
 
@@ -56,14 +56,14 @@ func (h Handler) handleValidUser(w http.ResponseWriter, r *http.Request) {
 	Authorization := r.Header.Get("Authorization")
 	if Authorization == "" {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: No authorization header: " + Authorization)
 		return
 	}
 
 	userId, err := auth.GetUserIdFromToken(Authorization)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		io.WriteString(w, "Error: Unauthorized")
+		io.WriteString(w, "Error: User not authorized: " + err.Error())
 		return
 	}
 

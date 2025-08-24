@@ -77,14 +77,14 @@ func HandleApiKey(next http.Handler) http.Handler {
 			userId, err := GetUserIdFromToken(token)
 			if err != nil {
 				w.WriteHeader(http.StatusUnauthorized)
-				io.WriteString(w, "Error: Unauthorized")
+				io.WriteString(w, "Error: Cannot get user id from token: " + err.Error())
 				return
 			}
 
 			key := r.URL.Query().Get("key")
 			if valid := validateApiKey(key, userId); !valid {
 				w.WriteHeader(http.StatusUnauthorized)
-				io.WriteString(w, "Error: Unauthorized")
+				io.WriteString(w, "Error: Api key is not valid")
 				return
 			}
 

@@ -57,7 +57,7 @@ func HandleAuthorization(next http.Handler) http.Handler {
 			for _, revokedToken := range revokedTokens {
 				if token == revokedToken {
 					w.WriteHeader(http.StatusUnauthorized)
-					io.WriteString(w, "Error: Unauthorized")
+					io.WriteString(w, "Error: Token has been revoked")
 					return
 				}
 			}
@@ -65,7 +65,7 @@ func HandleAuthorization(next http.Handler) http.Handler {
 			_, err := ValidateJWT(token)
 			if err != nil {
 				w.WriteHeader(http.StatusUnauthorized)
-				io.WriteString(w, "Error: Unauthorized")
+				io.WriteString(w, "Error: Token is not valid in middleware: " + err.Error())
 				return
 			}
 
