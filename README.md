@@ -26,7 +26,7 @@ Optionally, you can mount a drive in the 'files' folder to improve file manageme
 ## Mount systemd service:
 
 Update this variables on the `drive-api.service` both with absolute path:
-- `EXecStart`: your go generated binary
+- `ExecStart`: your go generated binary
 - `WorkingDirectory`: path of your application directory
 
 Run the following commands
